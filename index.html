@@ -112,7 +112,7 @@
 
 <!-- ===== LOGIN ===== -->
 <div id="loginScreen" class="screen active">
-  <header><h1>ðŸ“¦ Shopkiraana Receiving</h1></header>
+  <header><h1>Shopkiraana Receiving</h1></header>
   <div class="pad">
     <p style="color:var(--muted);font-size:14px">Register this phone once. Your
        number and device are recorded for the receiving log.</p>
@@ -131,7 +131,7 @@
   <header>
     <h1>Open invoices</h1><div class="grow"></div>
     <span class="online-dot" id="dot1"></span>
-    <button class="btn-ghost" style="padding:8px 12px;font-size:13px" onclick="loadInvoices()">â†»</button>
+    <button class="btn-ghost" style="padding:8px 12px;font-size:13px" onclick="loadInvoices()">Refresh</button>
   </header>
   <div id="invList" class="pad" style="overflow:auto"></div>
   <div id="invMsg" class="msg"></div>
@@ -140,15 +140,15 @@
 <!-- ===== RECEIVING ===== -->
 <div id="recvScreen" class="screen">
   <header>
-    <button class="btn-ghost" style="padding:8px 12px;font-size:13px" onclick="backToInvoices()">â†</button>
+    <button class="btn-ghost" style="padding:8px 12px;font-size:13px" onclick="backToInvoices()"><</button>
     <div><h1 id="recvTitle">Receiving</h1><div class="sub" id="recvSub"></div></div>
     <div class="grow"></div><span class="online-dot" id="dot2"></span>
   </header>
   <div class="scanbar">
     <div class="scanrow">
-      <input id="scanInput" placeholder="Scan barcode, or type a name to filterâ€¦"
+      <input id="scanInput" placeholder="Scan barcode, or type a name to filter..."
              autocomplete="off" autocapitalize="off" autocorrect="off">
-      <button class="cam-btn" onclick="openCamera()" title="Camera scan">ðŸ“·</button>
+      <button class="cam-btn" onclick="openCamera()" title="Camera scan">Cam</button>
     </div>
   </div>
   <div class="counts">
@@ -159,8 +159,8 @@
   </div>
   <div class="panels" id="panels"></div>
   <div class="bottom">
-    <button class="btn-ghost" onclick="saveProgress(false)">ðŸ’¾ Save</button>
-    <button class="btn-green" onclick="completeReceiving()">âœ… Complete</button>
+    <button class="btn-ghost" onclick="saveProgress(false)">Save</button>
+    <button class="btn-green" onclick="completeReceiving()">Complete</button>
   </div>
   <div id="recvMsg" class="msg"></div>
 </div>
@@ -197,7 +197,7 @@ var filterQuery = "";
 var html5qr = null;
 
 /* ============================ API ============================ */
-/* All calls go through one POST (text/plain â†’ no CORS preflight). Apps Script
+/* All calls go through one POST (text/plain  no CORS preflight). Apps Script
    returns an Access-Control-Allow-Origin:* response, so fetch can read it.
    This is more reliable than JSONP, which browsers may refuse to execute. */
 function api(params) {
@@ -214,7 +214,7 @@ function authParams() { return { deviceId: deviceId, token: auth ? auth.token : 
 function doRegister() {
   var name = inName.value.trim(), phone = inPhone.value.trim(), pin = inPin.value.trim();
   if (!phone || !pin) { setMsg(loginMsg, "Enter your number and PIN", "err"); return; }
-  setMsg(loginMsg, "Registeringâ€¦", "");
+  setMsg(loginMsg, "Registering...", "");
   api({ action: "register", phone: phone, pin: pin, deviceId: deviceId,
           name: name, userAgent: navigator.userAgent,
           platform: navigator.platform || "" })
@@ -230,15 +230,15 @@ function doRegister() {
 
 /* ============================ INVOICES ============================ */
 function loadInvoices() {
-  setMsg(invMsg, "Loadingâ€¦", "");
+  setMsg(invMsg, "Loading...", "");
   var p = authParams(); p.action = "listInvoices";
   api(p).then(function (res) {
-    if (!res.ok) { setMsg(invMsg, res.error === "auth" ? "Session expired â€” re-register"
+    if (!res.ok) { setMsg(invMsg, res.error === "auth" ? "Session expired - re-register"
                           : (res.error || "Error"), "err");
                    if (res.error === "auth") { localStorage.removeItem("auth"); show("loginScreen"); }
                    return; }
     renderInvoices(res.invoices || []); setMsg(invMsg, "", "");
-  }).catch(function () { setMsg(invMsg, "Offline â€” showing nothing", "warn"); });
+  }).catch(function () { setMsg(invMsg, "Offline - showing nothing", "warn"); });
 }
 function renderInvoices(list) {
   if (!list.length) { invList.innerHTML = '<div class="empty">No open invoices. Stage one from the desktop app first.</div>'; return; }
@@ -257,7 +257,7 @@ function renderInvoices(list) {
 function openInvoice(iv) {
   current = { invoiceId: iv.invoiceId, meta: iv, lines: [] };
   var p = authParams(); p.action = "getLines"; p.invoiceId = iv.invoiceId;
-  setMsg(recvMsg, "Loading linesâ€¦", "");
+  setMsg(recvMsg, "Loading lines...", "");
   api(p).then(function (res) {
     if (!res.ok) { setMsg(recvMsg, res.error || "Error", "err"); return; }
     current.lines = res.lines.map(function (l) {
@@ -273,7 +273,7 @@ function openInvoice(iv) {
     // offline: try cached
     var c = loadCachedLines(iv.invoiceId);
     if (c) { current.lines = c; show("recvScreen"); renderPanels();
-             setMsg(recvMsg, "Offline â€” using cached copy", "warn"); }
+             setMsg(recvMsg, "Offline - using cached copy", "warn"); }
     else setMsg(recvMsg, "Offline and no cached copy", "err");
   });
 }
@@ -318,13 +318,13 @@ function renderPanels() {
   var html = "";
   if (q) {
     var total = groups.PENDING.length + groups.RECEIVED.length + groups.SHORT.length;
-    html += '<div class="filterhint">ðŸ”Ž ' + total + ' match' + (total === 1 ? "" : "es") +
-            ' for â€œ' + esc(q) + 'â€ â€” tap to receive <span id="clrFilter">âœ• clear</span></div>';
+    html += '<div class="filterhint">' + total + ' match' + (total === 1 ? "" : "es") +
+            ' for "' + esc(q) + '" - tap to receive <span id="clrFilter">x clear</span></div>';
   }
-  html += panelHtml("pend", "ðŸ“‹ Still to receive â€” " + groups.PENDING.length,
-                    groups.PENDING, q ? "" : "Everything scanned. ðŸŽ‰");
-  html += panelHtml("recv", "âœ… Received â€” " + groups.RECEIVED.length, groups.RECEIVED, "");
-  html += panelHtml("short", "âš  Short / Not received â€” " + groups.SHORT.length, groups.SHORT, "");
+  html += panelHtml("pend", "Still to receive - " + groups.PENDING.length,
+                    groups.PENDING, q ? "" : "Everything scanned. ");
+  html += panelHtml("recv", "Received - " + groups.RECEIVED.length, groups.RECEIVED, "");
+  html += panelHtml("short", "Short / Not received - " + groups.SHORT.length, groups.SHORT, "");
   panels.innerHTML = html;
   [].forEach.call(panels.querySelectorAll(".row"), function (el) {
     el.onclick = function () { promptQty(el.getAttribute("data-id")); };
@@ -338,10 +338,10 @@ function panelHtml(cls, title, rows, emptyMsg) {
   if (!rows.length) return h + (emptyMsg ? '<div class="empty">' + esc(emptyMsg) + "</div>" : "");
   rows.forEach(function (l) {
     var st = lineStatus(l);
-    var recvTxt = l._received ? "<b>" + esc(String(l.qtyReceived)) + "</b>" : "<b>â€“</b>";
+    var recvTxt = l._received ? "<b>" + esc(String(l.qtyReceived)) + "</b>" : "<b>-</b>";
     h += '<div class="row s-' + st + '" data-id="' + esc(l.lineId) + '">' +
          '<div class="info"><div class="nm">' + esc(l.name || l.vendorDescription || l.code) + '</div>' +
-         '<div class="meta">' + esc(l.code || "") + (l.barcode ? " Â· " + esc(l.barcode) : "") + '</div></div>' +
+         '<div class="meta">' + esc(l.code || "") + (l.barcode ? " | " + esc(l.barcode) : "") + '</div></div>' +
          '<div class="qty"><span style="color:var(--muted)">bill ' + esc(String(l.qtyBilled)) + '</span><br>' +
          'recv ' + recvTxt + '</div></div>';
   });
@@ -358,13 +358,13 @@ scanInput && scanInput.addEventListener("keydown", function (e) {
 });
 function handleScan(q) {
   if (!q) return;
-  // exact barcode (from a scanner) â†’ receive immediately
+  // exact barcode (from a scanner)  receive immediately
   var exact = current.lines.filter(function (l) { return String(l.barcode || "").trim() === q; });
   if (exact.length === 1) { scanInput.value = ""; setFilter(""); promptQty(exact[0].lineId); return; }
   var ql = q.toLowerCase();
   var hits = current.lines.filter(function (l) { return matchLine(l, ql); });
   if (hits.length === 1) { scanInput.value = ""; setFilter(""); promptQty(hits[0].lineId); return; }
-  if (hits.length > 1) { setMsg(recvMsg, hits.length + " matches â€” tap the item", "warn"); return; }
+  if (hits.length > 1) { setMsg(recvMsg, hits.length + " matches - tap the item", "warn"); return; }
   setMsg(recvMsg, "No item matches \"" + q + "\"", "err");
   if (navigator.vibrate) navigator.vibrate(120);
 }
@@ -375,7 +375,7 @@ function promptQty(lineId) {
   var l = findByLineId(lineId); if (!l) return;
   qmLine = l;
   qmName.textContent = l.name || l.vendorDescription || l.code;
-  qmBilled.textContent = "Billed: " + l.qtyBilled + (l.barcode ? "  Â·  " + l.barcode : "");
+  qmBilled.textContent = "Billed: " + l.qtyBilled + (l.barcode ? "  |  " + l.barcode : "");
   qmQty.value = l._received ? l.qtyReceived : l.qtyBilled;
   qtyModal.classList.add("active");
   setTimeout(function(){ qmQty.focus(); qmQty.select(); }, 100);
@@ -388,7 +388,7 @@ function confirmQty() {
   l._received = true; l._dirty = true;
   closeQty(); cacheLines();
   scanInput.value = ""; setFilter("");   // reset list for the next item
-  setMsg(recvMsg, "âœ“ " + (l.name || "").slice(0, 32), "ok");
+  setMsg(recvMsg, "Received: " + (l.name || "").slice(0, 32), "ok");
   if (navigator.vibrate) navigator.vibrate(40);
   scanInput.focus();
 }
@@ -419,14 +419,14 @@ function dirtyUpdates() {
 function saveProgress(silent) {
   var ups = dirtyUpdates();
   if (!ups.length) { if (!silent) setMsg(recvMsg, "Nothing new to save", "warn"); return Promise.resolve(true); }
-  setMsg(recvMsg, "Saving " + ups.length + "â€¦", "");
+  setMsg(recvMsg, "Saving " + ups.length + "...", "");
   var body = { action: "saveProgress", deviceId: deviceId, token: auth.token,
                invoiceId: current.invoiceId, updates: ups };
   return api(body).then(function (res) {
     if (res.ok) { current.lines.forEach(function (l){ l._dirty = false; }); cacheLines();
                   if (!silent) setMsg(recvMsg, "Saved " + res.updated + " line(s)", "ok"); return true; }
     setMsg(recvMsg, res.error || "Save failed", "err"); return false;
-  }).catch(function () { setMsg(recvMsg, "Offline â€” saved on this phone, will retry", "warn");
+  }).catch(function () { setMsg(recvMsg, "Offline - saved on this phone, will retry", "warn");
                          cacheLines(); return false; });
 }
 function completeReceiving() {
@@ -438,12 +438,12 @@ function completeReceiving() {
   var ups = dirtyUpdates();
   var body = { action: "complete", deviceId: deviceId, token: auth.token,
                invoiceId: current.invoiceId, updates: ups };
-  setMsg(recvMsg, "Completingâ€¦", "");
+  setMsg(recvMsg, "Completing...", "");
   api(body).then(function (res) {
-    if (res.ok) { clearCache(current.invoiceId); setMsg(recvMsg, "Done âœ“", "ok");
+    if (res.ok) { clearCache(current.invoiceId); setMsg(recvMsg, "Done OK", "ok");
                   setTimeout(function(){ backToInvoices(); }, 600); }
     else setMsg(recvMsg, res.error || "Complete failed", "err");
-  }).catch(function () { setMsg(recvMsg, "Offline â€” connect and try Complete again", "err"); });
+  }).catch(function () { setMsg(recvMsg, "Offline - connect and try Complete again", "err"); });
 }
 function backToInvoices() { show("invScreen"); loadInvoices(); }
 
