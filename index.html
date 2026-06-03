@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1419">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Shopkiraana Receiving</title>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#171f28; --panel2:#1f2a36; --line:#2b3744;
+    --text:#e8edf2; --muted:#8a9bab; --accent:#e08a3c;
+    --green:#2faa5e; --green-bg:#15301f; --amber:#d6a312; --amber-bg:#332a0e;
+    --red:#d64545; --red-bg:#341717;
+    --font:"Segoe UI",system-ui,-apple-system,sans-serif;
+    --mono:"SFMono-Regular",Consolas,"Roboto Mono",monospace;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);
+       font-size:16px;overscroll-behavior:none}
+  .screen{display:none;flex-direction:column;height:100dvh;padding:env(safe-area-inset-top) 0 0}
+  .screen.active{display:flex}
+  header{display:flex;align-items:center;gap:10px;padding:14px 16px;
+         background:var(--panel);border-bottom:1px solid var(--line)}
+  header h1{font-size:16px;margin:0;font-weight:700;letter-spacing:.3px}
+  header .sub{font-size:12px;color:var(--muted)}
+  .grow{flex:1}
+  button{font-family:var(--font);font-size:16px;border:0;border-radius:12px;
+         padding:14px 16px;cursor:pointer;font-weight:700}
+  .btn-primary{background:var(--accent);color:#1a1109}
+  .btn-green{background:var(--green);color:#04140b}
+  .btn-ghost{background:var(--panel2);color:var(--text)}
+  input{font-family:var(--font);font-size:18px;width:100%;padding:14px;
+        background:#0b0f14;color:var(--text);border:1px solid var(--line);
+        border-radius:12px;outline:none}
+  input:focus{border-color:var(--accent)}
+  .pad{padding:16px}
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin:0 0 6px 4px}
+  .msg{min-height:20px;font-size:13px;padding:6px 16px}
+  .msg.err{color:var(--red)} .msg.ok{color:var(--green)} .msg.warn{color:var(--amber)}
+
+  /* invoices list */
+  .inv-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+            padding:14px 16px;margin:0 16px 12px;display:flex;align-items:center;gap:12px}
+  .inv-card .n{font-weight:700;font-size:16px}
+  .inv-card .d{font-size:13px;color:var(--muted)}
+  .pill{font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px;
+        background:var(--panel2);color:var(--muted)}
+
+  /* scan bar */
+  .scanbar{padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+  .scanrow{display:flex;gap:8px}
+  .scanrow input{font-size:20px}
+  .cam-btn{flex:0 0 auto;width:56px;border-radius:12px;background:var(--panel2);
+           font-size:22px;padding:0}
+  .counts{display:flex;gap:14px;padding:8px 16px;font-size:13px;font-weight:700;
+          background:var(--panel);border-bottom:1px solid var(--line)}
+  .counts .c-recv{color:var(--green)} .counts .c-short{color:var(--red)}
+  .counts .c-pend{color:var(--accent)} .counts .c-tot{color:var(--muted)}
+
+  /* panels */
+  .panels{flex:1;overflow:auto;padding:8px 12px 90px}
+  .panel-h{font-size:13px;font-weight:700;margin:14px 6px 6px;display:flex;
+           align-items:center;gap:8px}
+  .panel-h.recv{color:var(--green)} .panel-h.short{color:var(--red)}
+  .panel-h.pend{color:var(--accent)}
+  .row{display:flex;align-items:center;gap:10px;padding:12px;border-radius:12px;
+       margin-bottom:8px;border:1px solid var(--line);background:var(--panel)}
+  .row.s-RECEIVED{background:var(--green-bg);border-color:#1f4d31}
+  .row.s-SHORT{background:var(--amber-bg);border-color:#5a4a12}
+  .row.s-NOT_RECEIVED{background:var(--red-bg);border-color:#5a2222}
+  .row .info{flex:1;min-width:0}
+  .row .nm{font-weight:600;font-size:15px;white-space:nowrap;overflow:hidden;
+           text-overflow:ellipsis}
+  .row .meta{font-size:12px;color:var(--muted);font-family:var(--mono);margin-top:2px}
+  .row .qty{text-align:right;font-size:13px;white-space:nowrap}
+  .row .qty b{font-size:18px}
+  .empty{color:var(--muted);font-size:13px;padding:10px 6px}
+
+  /* bottom bar */
+  .bottom{position:fixed;left:0;right:0;bottom:0;display:flex;gap:10px;padding:12px 16px
+          calc(12px + env(safe-area-inset-bottom));background:var(--panel);
+          border-top:1px solid var(--line)}
+  .bottom button{flex:1}
+
+  /* modals */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;
+         align-items:center;justify-content:center;z-index:50;padding:20px}
+  .modal.active{display:flex}
+  .sheet{background:var(--panel);border:1px solid var(--line);border-radius:18px;
+         width:100%;max-width:420px;padding:18px}
+  .sheet h3{margin:0 0 4px;font-size:18px}
+  .sheet .qm{font-size:12px;color:var(--muted);margin-bottom:14px}
+  .qty-input{font-size:34px;text-align:center;padding:18px}
+  .modal-row{display:flex;gap:10px;margin-top:14px}
+  .modal-row button{flex:1}
+  #reader{width:100%;border-radius:12px;overflow:hidden}
+  .online-dot{width:9px;height:9px;border-radius:50%;background:var(--green)}
+  .online-dot.off{background:var(--red)}
+  .badge{font-size:11px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<!-- ===== LOGIN ===== -->
+<div id="loginScreen" class="screen active">
+  <header><h1>📦 Shopkiraana Receiving</h1></header>
+  <div class="pad">
+    <p style="color:var(--muted);font-size:14px">Register this phone once. Your
+       number and device are recorded for the receiving log.</p>
+    <div class="field"><label>Your name</label><input id="inName" autocomplete="name"></div>
+    <div class="field"><label>Mobile number</label>
+      <input id="inPhone" type="tel" inputmode="numeric" autocomplete="tel"></div>
+    <div class="field"><label>PIN</label>
+      <input id="inPin" type="password" inputmode="numeric"></div>
+    <button class="btn-primary" style="width:100%" onclick="doRegister()">Continue</button>
+    <div id="loginMsg" class="msg"></div>
+  </div>
+</div>
+
+<!-- ===== INVOICES ===== -->
+<div id="invScreen" class="screen">
+  <header>
+    <h1>Open invoices</h1><div class="grow"></div>
+    <span class="online-dot" id="dot1"></span>
+    <button class="btn-ghost" style="padding:8px 12px;font-size:13px" onclick="loadInvoices()">↻</button>
+  </header>
+  <div id="invList" class="pad" style="overflow:auto"></div>
+  <div id="invMsg" class="msg"></div>
+</div>
+
+<!-- ===== RECEIVING ===== -->
+<div id="recvScreen" class="screen">
+  <header>
+    <button class="btn-ghost" style="padding:8px 12px;font-size:13px" onclick="backToInvoices()">←</button>
+    <div><h1 id="recvTitle">Receiving</h1><div class="sub" id="recvSub"></div></div>
+    <div class="grow"></div><span class="online-dot" id="dot2"></span>
+  </header>
+  <div class="scanbar">
+    <div class="scanrow">
+      <input id="scanInput" placeholder="Scan or type name / code, then Enter"
+             autocomplete="off" autocapitalize="off" autocorrect="off">
+      <button class="cam-btn" onclick="openCamera()" title="Camera scan">📷</button>
+    </div>
+  </div>
+  <div class="counts">
+    <span class="c-recv" id="cRecv">Received 0</span>
+    <span class="c-short" id="cShort">Short 0</span>
+    <span class="c-pend" id="cPend">Pending 0</span>
+    <span class="c-tot grow" id="cTot">Total 0</span>
+  </div>
+  <div class="panels" id="panels"></div>
+  <div class="bottom">
+    <button class="btn-ghost" onclick="saveProgress(false)">💾 Save</button>
+    <button class="btn-green" onclick="completeReceiving()">✅ Complete</button>
+  </div>
+  <div id="recvMsg" class="msg"></div>
+</div>
+
+<!-- ===== QTY MODAL ===== -->
+<div id="qtyModal" class="modal"><div class="sheet">
+  <h3 id="qmName"></h3><div class="qm" id="qmBilled"></div>
+  <input id="qmQty" class="qty-input" type="number" inputmode="decimal">
+  <div class="modal-row">
+    <button class="btn-ghost" onclick="closeQty()">Cancel</button>
+    <button class="btn-green" onclick="confirmQty()">Confirm</button>
+  </div>
+</div></div>
+
+<!-- ===== CAMERA MODAL ===== -->
+<div id="camModal" class="modal"><div class="sheet">
+  <h3>Scan barcode</h3><div class="qm">Point the rear camera at the barcode.</div>
+  <div id="reader"></div>
+  <div class="modal-row"><button class="btn-ghost" onclick="closeCamera()">Close</button></div>
+</div></div>
+
+<script>
+/* ============================ CONFIG ============================ */
+/* After deploying Code.gs, paste your Web-app /exec URL here: */
+var API_URL = "https://script.google.com/macros/s/AKfycbxfnLZWxBUHai1dksbEiPwJiIeBcvZ01lDm_7CWLw6QpTmlbECzSn-jolGH6gmAEv0G/exec";
+
+/* ============================ STATE ============================ */
+var auth = JSON.parse(localStorage.getItem("auth") || "null");
+var deviceId = localStorage.getItem("deviceId");
+if (!deviceId) { deviceId = (crypto.randomUUID ? crypto.randomUUID()
+                 : String(Date.now()) + Math.random()); localStorage.setItem("deviceId", deviceId); }
+var current = { invoiceId: null, meta: null, lines: [] };
+var html5qr = null;
+
+/* ============================ API ============================ */
+// reads + register go through JSONP (no CORS headaches)
+function jsonp(params) {
+  return new Promise(function (resolve, reject) {
+    var cb = "cb" + Date.now() + Math.floor(Math.random() * 1e6);
+    var qs = Object.keys(params).map(function (k) {
+      return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
+    }).join("&");
+    var s = document.createElement("script");
+    var to = setTimeout(function () { cleanup(); reject(new Error("timeout")); }, 15000);
+    function cleanup(){ clearTimeout(to); delete window[cb]; s.remove(); }
+    window[cb] = function (data) { cleanup(); resolve(data); };
+    s.onerror = function(){ cleanup(); reject(new Error("network")); };
+    s.src = API_URL + "?callback=" + cb + "&" + qs;
+    document.body.appendChild(s);
+  });
+}
+// writes go through POST text/plain (simple request, no preflight)
+function apiPost(body) {
+  return fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(body)
+  }).then(function (r) { return r.json(); });
+}
+function authParams() { return { deviceId: deviceId, token: auth ? auth.token : "" }; }
+
+/* ============================ AUTH ============================ */
+function doRegister() {
+  var name = inName.value.trim(), phone = inPhone.value.trim(), pin = inPin.value.trim();
+  if (!phone || !pin) { setMsg(loginMsg, "Enter your number and PIN", "err"); return; }
+  setMsg(loginMsg, "Registering…", "");
+  jsonp({ action: "register", phone: phone, pin: pin, deviceId: deviceId,
+          name: name, userAgent: navigator.userAgent,
+          platform: navigator.platform || "" })
+    .then(function (res) {
+      if (res.ok) {
+        auth = { token: res.token, phone: phone, name: name };
+        localStorage.setItem("auth", JSON.stringify(auth));
+        show("invScreen"); loadInvoices();
+      } else { setMsg(loginMsg, res.error || "Registration failed", "err"); }
+    })
+    .catch(function () { setMsg(loginMsg, "Cannot reach server — check API URL / connection", "err"); });
+}
+
+/* ============================ INVOICES ============================ */
+function loadInvoices() {
+  setMsg(invMsg, "Loading…", "");
+  var p = authParams(); p.action = "listInvoices";
+  jsonp(p).then(function (res) {
+    if (!res.ok) { setMsg(invMsg, res.error === "auth" ? "Session expired — re-register"
+                          : (res.error || "Error"), "err");
+                   if (res.error === "auth") { localStorage.removeItem("auth"); show("loginScreen"); }
+                   return; }
+    renderInvoices(res.invoices || []); setMsg(invMsg, "", "");
+  }).catch(function () { setMsg(invMsg, "Offline — showing nothing", "warn"); });
+}
+function renderInvoices(list) {
+  if (!list.length) { invList.innerHTML = '<div class="empty">No open invoices. Stage one from the desktop app first.</div>'; return; }
+  invList.innerHTML = "";
+  list.forEach(function (iv) {
+    var d = document.createElement("div"); d.className = "inv-card";
+    d.innerHTML = '<div class="grow"><div class="n">' + esc(iv.invoiceNumber || iv.invoiceId) +
+      '</div><div class="d">' + esc(iv.vendor_name || "") + ' &middot; ' + esc(iv.invoiceDate || "") +
+      '</div></div><span class="pill">' + iv.received + "/" + iv.lines + "</span>";
+    d.onclick = function () { openInvoice(iv); };
+    invList.appendChild(d);
+  });
+}
+
+/* ============================ RECEIVING ============================ */
+function openInvoice(iv) {
+  current = { invoiceId: iv.invoiceId, meta: iv, lines: [] };
+  var p = authParams(); p.action = "getLines"; p.invoiceId = iv.invoiceId;
+  setMsg(recvMsg, "Loading lines…", "");
+  jsonp(p).then(function (res) {
+    if (!res.ok) { setMsg(recvMsg, res.error || "Error", "err"); return; }
+    current.lines = res.lines.map(function (l) {
+      l._received = String(l.lineStatus || "").toUpperCase() !== "PENDING" && l.qtyReceived !== "";
+      l._dirty = false; return l;
+    });
+    cacheLines();
+    recvTitle.textContent = "Invoice " + (iv.invoiceNumber || "");
+    recvSub.textContent = (iv.vendor_name || "");
+    show("recvScreen"); renderPanels(); setMsg(recvMsg, "", "");
+    setTimeout(function(){ scanInput.focus(); }, 200);
+  }).catch(function () {
+    // offline: try cached
+    var c = loadCachedLines(iv.invoiceId);
+    if (c) { current.lines = c; show("recvScreen"); renderPanels();
+             setMsg(recvMsg, "Offline — using cached copy", "warn"); }
+    else setMsg(recvMsg, "Offline and no cached copy", "err");
+  });
+}
+function lineStatus(l) {
+  if (!l._received) return "PENDING";
+  var b = num(l.qtyBilled), r = num(l.qtyReceived);
+  if (r <= 0) return "NOT_RECEIVED";
+  if (r < b)  return "SHORT";
+  return "RECEIVED";
+}
+function renderPanels() {
+  var groups = { PENDING: [], RECEIVED: [], SHORT: [] };
+  var nRecv = 0, nShort = 0, nPend = 0;
+  current.lines.forEach(function (l) {
+    var st = lineStatus(l);
+    if (st === "PENDING") { groups.PENDING.push(l); nPend++; }
+    else if (st === "RECEIVED") { groups.RECEIVED.push(l); nRecv++; }
+    else { groups.SHORT.push(l); nShort++; }
+  });
+  cRecv.textContent = "Received " + nRecv;
+  cShort.textContent = "Short " + nShort;
+  cPend.textContent = "Pending " + nPend;
+  cTot.textContent = "Total " + current.lines.length;
+  var html = "";
+  html += panelHtml("pend", "📋 Still to receive — " + nPend, groups.PENDING,
+                    "Everything scanned. 🎉");
+  html += panelHtml("recv", "✅ Received — " + nRecv, groups.RECEIVED, "");
+  html += panelHtml("short", "⚠ Short / Not received — " + nShort, groups.SHORT, "");
+  panels.innerHTML = html;
+  [].forEach.call(panels.querySelectorAll(".row"), function (el) {
+    el.onclick = function () { promptQty(el.getAttribute("data-id")); };
+  });
+}
+function panelHtml(cls, title, rows, emptyMsg) {
+  var h = '<div class="panel-h ' + cls + '">' + title + "</div>";
+  if (!rows.length) return h + (emptyMsg ? '<div class="empty">' + esc(emptyMsg) + "</div>" : "");
+  rows.forEach(function (l) {
+    var st = lineStatus(l);
+    var recvTxt = l._received ? "<b>" + esc(String(l.qtyReceived)) + "</b>" : "<b>–</b>";
+    h += '<div class="row s-' + st + '" data-id="' + esc(l.lineId) + '">' +
+         '<div class="info"><div class="nm">' + esc(l.name || l.vendorDescription || l.code) + '</div>' +
+         '<div class="meta">' + esc(l.code || "") + (l.barcode ? " · " + esc(l.barcode) : "") + '</div></div>' +
+         '<div class="qty"><span style="color:var(--muted)">bill ' + esc(String(l.qtyBilled)) + '</span><br>' +
+         'recv ' + recvTxt + '</div></div>';
+  });
+  return h;
+}
+function findByLineId(id) { for (var i=0;i<current.lines.length;i++) if (String(current.lines[i].lineId)===String(id)) return current.lines[i]; return null; }
+
+/* ----- scanning ----- */
+scanInput && scanInput.addEventListener("keydown", function (e) {
+  if (e.key === "Enter") { e.preventDefault(); handleScan(scanInput.value.trim()); scanInput.value = ""; }
+});
+function handleScan(q) {
+  if (!q) return;
+  var exact = current.lines.filter(function (l) { return String(l.barcode || "").trim() === q; });
+  if (exact.length === 1) { promptQty(exact[0].lineId); return; }
+  var ql = q.toLowerCase();
+  var hits = current.lines.filter(function (l) {
+    return (l.name || "").toLowerCase().indexOf(ql) >= 0
+        || (l.code || "").toLowerCase().indexOf(ql) >= 0
+        || (l.vendorDescription || "").toLowerCase().indexOf(ql) >= 0;
+  });
+  if (hits.length === 1) { promptQty(hits[0].lineId); return; }
+  if (hits.length > 1) { setMsg(recvMsg, hits.length + " matches — tap the right row", "warn"); return; }
+  setMsg(recvMsg, "No item matches \"" + q + "\"", "err");
+  if (navigator.vibrate) navigator.vibrate(120);
+}
+
+/* ----- qty modal ----- */
+var qmLine = null;
+function promptQty(lineId) {
+  var l = findByLineId(lineId); if (!l) return;
+  qmLine = l;
+  qmName.textContent = l.name || l.vendorDescription || l.code;
+  qmBilled.textContent = "Billed: " + l.qtyBilled + (l.barcode ? "  ·  " + l.barcode : "");
+  qmQty.value = l._received ? l.qtyReceived : l.qtyBilled;
+  qtyModal.classList.add("active");
+  setTimeout(function(){ qmQty.focus(); qmQty.select(); }, 100);
+}
+function closeQty() { qtyModal.classList.remove("active"); qmLine = null; }
+function confirmQty() {
+  if (!qmLine) return;
+  qmLine.qtyReceived = qmQty.value.trim();
+  qmLine._received = true; qmLine._dirty = true;
+  closeQty(); cacheLines(); renderPanels();
+  setMsg(recvMsg, "✓ " + (qmLine.name || "").slice(0, 32), "ok");
+  if (navigator.vibrate) navigator.vibrate(40);
+  scanInput.focus();
+}
+
+/* ----- camera ----- */
+function openCamera() {
+  camModal.classList.add("active");
+  html5qr = new Html5Qrcode("reader");
+  var cfg = { fps: 12, qrbox: { width: 240, height: 160 },
+              formatsToSupport: undefined, rememberLastUsedCamera: true };
+  html5qr.start({ facingMode: "environment" }, cfg, function (text) {
+    if (navigator.vibrate) navigator.vibrate(60);
+    closeCamera(); handleScan(text.trim());
+  }, function () {}).catch(function (err) {
+    setMsg(recvMsg, "Camera error: " + err, "err"); closeCamera();
+  });
+}
+function closeCamera() {
+  camModal.classList.remove("active");
+  if (html5qr) { html5qr.stop().then(function(){ html5qr.clear(); html5qr=null; }).catch(function(){ html5qr=null; }); }
+}
+
+/* ----- save / complete ----- */
+function dirtyUpdates() {
+  return current.lines.filter(function (l) { return l._dirty; })
+    .map(function (l) { return { lineId: l.lineId, qtyReceived: String(l.qtyReceived) }; });
+}
+function saveProgress(silent) {
+  var ups = dirtyUpdates();
+  if (!ups.length) { if (!silent) setMsg(recvMsg, "Nothing new to save", "warn"); return Promise.resolve(true); }
+  setMsg(recvMsg, "Saving " + ups.length + "…", "");
+  var body = { action: "saveProgress", deviceId: deviceId, token: auth.token,
+               invoiceId: current.invoiceId, updates: ups };
+  return apiPost(body).then(function (res) {
+    if (res.ok) { current.lines.forEach(function (l){ l._dirty = false; }); cacheLines();
+                  if (!silent) setMsg(recvMsg, "Saved " + res.updated + " line(s)", "ok"); return true; }
+    setMsg(recvMsg, res.error || "Save failed", "err"); return false;
+  }).catch(function () { setMsg(recvMsg, "Offline — saved on this phone, will retry", "warn");
+                         cacheLines(); return false; });
+}
+function completeReceiving() {
+  var pend = current.lines.filter(function (l){ return lineStatus(l) === "PENDING"; }).length;
+  var ok = confirm(pend
+    ? (pend + " line(s) not received will be recorded as short. Complete this invoice?")
+    : "Complete this invoice?");
+  if (!ok) return;
+  var ups = dirtyUpdates();
+  var body = { action: "complete", deviceId: deviceId, token: auth.token,
+               invoiceId: current.invoiceId, updates: ups };
+  setMsg(recvMsg, "Completing…", "");
+  apiPost(body).then(function (res) {
+    if (res.ok) { clearCache(current.invoiceId); setMsg(recvMsg, "Done ✓", "ok");
+                  setTimeout(function(){ backToInvoices(); }, 600); }
+    else setMsg(recvMsg, res.error || "Complete failed", "err");
+  }).catch(function () { setMsg(recvMsg, "Offline — connect and try Complete again", "err"); });
+}
+function backToInvoices() { show("invScreen"); loadInvoices(); }
+
+/* ============================ CACHE (offline) ============================ */
+function cacheLines()  { try { localStorage.setItem("lines_" + current.invoiceId, JSON.stringify(current.lines)); } catch(e){} }
+function loadCachedLines(id) { try { return JSON.parse(localStorage.getItem("lines_" + id) || "null"); } catch(e){ return null; } }
+function clearCache(id) { localStorage.removeItem("lines_" + id); }
+
+/* ============================ HELPERS ============================ */
+function show(id){ ["loginScreen","invScreen","recvScreen"].forEach(function(s){
+  document.getElementById(s).classList.toggle("active", s===id); }); }
+function setMsg(el, t, cls){ el.textContent = t; el.className = "msg" + (cls ? " " + cls : ""); }
+function num(v){ var f = parseFloat(String(v).replace(/[^0-9.\-]/g,"")); return isNaN(f)?0:f; }
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){
+  return ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"})[c]; }); }
+function setOnline(){ var on = navigator.onLine;
+  [dot1,dot2].forEach(function(d){ if(d) d.classList.toggle("off", !on); }); }
+window.addEventListener("online", setOnline); window.addEventListener("offline", setOnline);
+
+/* ============================ BOOT ============================ */
+setOnline();
+if (auth && auth.token) { show("invScreen"); loadInvoices(); } else { show("loginScreen"); }
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js").catch(function(){});
+}
+</script>
+</body>
+</html>
