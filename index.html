@@ -197,28 +197,15 @@ var filterQuery = "";
 var html5qr = null;
 
 /* ============================ API ============================ */
-// reads + register go through JSONP (no CORS headaches)
-function jsonp(params) {
-  return new Promise(function (resolve, reject) {
-    var cb = "cb" + Date.now() + Math.floor(Math.random() * 1e6);
-    var qs = Object.keys(params).map(function (k) {
-      return encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
-    }).join("&");
-    var s = document.createElement("script");
-    var to = setTimeout(function () { cleanup(); reject(new Error("timeout")); }, 15000);
-    function cleanup(){ clearTimeout(to); delete window[cb]; s.remove(); }
-    window[cb] = function (data) { cleanup(); resolve(data); };
-    s.onerror = function(){ cleanup(); reject(new Error("network")); };
-    s.src = API_URL + "?callback=" + cb + "&" + qs;
-    document.body.appendChild(s);
-  });
-}
-// writes go through POST text/plain (simple request, no preflight)
-function apiPost(body) {
+/* All calls go through one POST (text/plain â†’ no CORS preflight). Apps Script
+   returns an Access-Control-Allow-Origin:* response, so fetch can read it.
+   This is more reliable than JSONP, which browsers may refuse to execute. */
+function api(params) {
   return fetch(API_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(body)
+    body: JSON.stringify(params),
+    redirect: "follow"
   }).then(function (r) { return r.json(); });
 }
 function authParams() { return { deviceId: deviceId, token: auth ? auth.token : "" }; }
@@ -228,7 +215,7 @@ function doRegister() {
   var name = inName.value.trim(), phone = inPhone.value.trim(), pin = inPin.value.trim();
   if (!phone || !pin) { setMsg(loginMsg, "Enter your number and PIN", "err"); return; }
   setMsg(loginMsg, "Registeringâ€¦", "");
-  jsonp({ action: "register", phone: phone, pin: pin, deviceId: deviceId,
+  api({ action: "register", phone: phone, pin: pin, deviceId: deviceId,
           name: name, userAgent: navigator.userAgent,
           platform: navigator.platform || "" })
     .then(function (res) {
@@ -238,14 +225,14 @@ function doRegister() {
         show("invScreen"); loadInvoices();
       } else { setMsg(loginMsg, res.error || "Registration failed", "err"); }
     })
-    .catch(function () { setMsg(loginMsg, "Cannot reach server â€” check API URL / connection", "err"); });
+    .catch(function (err) { setMsg(loginMsg, "Cannot reach server: " + err, "err"); });
 }
 
 /* ============================ INVOICES ============================ */
 function loadInvoices() {
   setMsg(invMsg, "Loadingâ€¦", "");
   var p = authParams(); p.action = "listInvoices";
-  jsonp(p).then(function (res) {
+  api(p).then(function (res) {
     if (!res.ok) { setMsg(invMsg, res.error === "auth" ? "Session expired â€” re-register"
                           : (res.error || "Error"), "err");
                    if (res.error === "auth") { localStorage.removeItem("auth"); show("loginScreen"); }
@@ -271,7 +258,7 @@ function openInvoice(iv) {
   current = { invoiceId: iv.invoiceId, meta: iv, lines: [] };
   var p = authParams(); p.action = "getLines"; p.invoiceId = iv.invoiceId;
   setMsg(recvMsg, "Loading linesâ€¦", "");
-  jsonp(p).then(function (res) {
+  api(p).then(function (res) {
     if (!res.ok) { setMsg(recvMsg, res.error || "Error", "err"); return; }
     current.lines = res.lines.map(function (l) {
       l._received = String(l.lineStatus || "").toUpperCase() !== "PENDING" && l.qtyReceived !== "";
@@ -435,7 +422,7 @@ function saveProgress(silent) {
   setMsg(recvMsg, "Saving " + ups.length + "â€¦", "");
   var body = { action: "saveProgress", deviceId: deviceId, token: auth.token,
                invoiceId: current.invoiceId, updates: ups };
-  return apiPost(body).then(function (res) {
+  return api(body).then(function (res) {
     if (res.ok) { current.lines.forEach(function (l){ l._dirty = false; }); cacheLines();
                   if (!silent) setMsg(recvMsg, "Saved " + res.updated + " line(s)", "ok"); return true; }
     setMsg(recvMsg, res.error || "Save failed", "err"); return false;
@@ -452,7 +439,7 @@ function completeReceiving() {
   var body = { action: "complete", deviceId: deviceId, token: auth.token,
                invoiceId: current.invoiceId, updates: ups };
   setMsg(recvMsg, "Completingâ€¦", "");
-  apiPost(body).then(function (res) {
+  api(body).then(function (res) {
     if (res.ok) { clearCache(current.invoiceId); setMsg(recvMsg, "Done âœ“", "ok");
                   setTimeout(function(){ backToInvoices(); }, 600); }
     else setMsg(recvMsg, res.error || "Complete failed", "err");
